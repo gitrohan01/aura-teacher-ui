@@ -1,8 +1,6 @@
-// Simple React AURA Teacher Panel
-// Uses React 18 via CDN, no build tools needed.
+// Simple AURA Teacher Panel (React 18 via CDN)
 
-// 🔧 Change this later to your actual ESP32-S3 IP:
-const S3_BASE_URL = "http://192.168.0.150";
+const S3_BASE_URL = "http://10.112.171.2"; // ⭐ YOUR ESP32-S3 IP
 
 const { useState, useEffect } = React;
 
@@ -25,29 +23,24 @@ function App() {
       setAttendance(data);
     } catch (e) {
       setError("Failed to load attendance from device.");
-      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadAttendance();
-  }, []);
+  useEffect(() => { loadAttendance(); }, []);
 
-  const togglePresent = (studentId) => {
-    if (!attendance) return;
+  const togglePresent = (id) => {
     const updated = {
       ...attendance,
       students: attendance.students.map((s) =>
-        s.student_id === studentId ? { ...s, present: !s.present } : s
+        s.student_id === id ? { ...s, present: !s.present } : s
       ),
     };
     setAttendance(updated);
   };
 
   const saveChanges = async () => {
-    if (!attendance) return;
     try {
       setSaving(true);
       setError("");
@@ -66,44 +59,39 @@ function App() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error();
       const data = await res.json();
-      if (!data.ok) throw new Error("Device update failed");
+      if (!data.ok) throw new Error();
+
       setInfo("Changes saved to device.");
-    } catch (e) {
+    } catch {
       setError("Failed to save changes.");
-      console.error(e);
     } finally {
       setSaving(false);
     }
   };
 
   const submitToAura = async () => {
-    if (!attendance) return;
-    if (!window.confirm("Submit final attendance to Aura? This will lock it.")) {
-      return;
-    }
-
+    if (!window.confirm("Submit to Aura? This will lock it.")) return;
     try {
       setSubmitting(true);
       setError("");
       setInfo("");
 
-      const res = await fetch(`${S3_BASE_URL}/api/attendance/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
+      const res =
+        await fetch(`${S3_BASE_URL}/api/attendance/submit`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (!data.ok) throw new Error("Device submit failed");
+      if (!data.ok) throw new Error();
 
-      setInfo("Attendance submitted to Aura successfully.");
+      setInfo("Submitted to Aura.");
       loadAttendance();
-    } catch (e) {
-      setError("Failed to submit to Aura.");
-      console.error(e);
+    } catch {
+      setError("Failed to submit.");
     } finally {
       setSubmitting(false);
     }
@@ -112,131 +100,79 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center px-4 py-6">
       <div className="w-full max-w-5xl bg-slate-900 rounded-2xl shadow-lg border border-slate-800 p-5 md:p-7">
+
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-2xl md:text-3xl font-semibold">
-              AURA • Teacher Panel
-            </h1>
+            <h1 className="text-2xl md:text-3xl font-semibold">AURA • Teacher Panel</h1>
             <p className="text-sm text-slate-400">
               Class: <span className="font-medium">MCA-II Sigma</span>{" "}
-              {attendance && attendance.date && (
-                <>
-                  • Date:{" "}
-                  <span className="font-mono">{attendance.date}</span>
-                </>
+              {attendance && (
+                <> • Date: <span className="font-mono">{attendance.date}</span></>
               )}
             </p>
           </div>
+
           <div className="flex flex-wrap gap-2">
             <button
               onClick={loadAttendance}
-              className="px-3 py-2 rounded-xl text-sm border border-slate-600 hover:bg-slate-800 disabled:opacity-60"
-              disabled={loading || saving || submitting}
-            >
+              className="px-3 py-2 rounded-xl text-sm border border-slate-600 hover:bg-slate-800">
               🔄 Refresh
             </button>
+
             <button
               onClick={saveChanges}
-              className="px-4 py-2 rounded-xl text-sm bg-sky-500 hover:bg-sky-600 disabled:opacity-60"
-              disabled={loading || saving || submitting || !attendance}
-            >
+              className="px-4 py-2 rounded-xl text-sm bg-sky-500 hover:bg-sky-600">
               💾 {saving ? "Saving..." : "Save Changes"}
             </button>
+
             <button
               onClick={submitToAura}
-              className="px-4 py-2 rounded-xl text-sm bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60"
-              disabled={loading || submitting || !attendance}
-            >
+              className="px-4 py-2 rounded-xl text-sm bg-emerald-500 hover:bg-emerald-600">
               ✅ {submitting ? "Submitting..." : "Submit to Aura"}
             </button>
           </div>
         </header>
 
-        {loading && (
-          <p className="text-slate-300 text-sm">Loading attendance…</p>
-        )}
-
-        {error && (
-          <div className="mb-3 text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-xl px-3 py-2">
-            {error}
-          </div>
-        )}
-
-        {info && (
-          <div className="mb-3 text-sm text-emerald-300 bg-emerald-950/30 border border-emerald-800 rounded-xl px-3 py-2">
-            {info}
-          </div>
-        )}
+        {loading && <p className="text-slate-300">Loading...</p>}
+        {error && <p className="text-red-400">{error}</p>}
+        {info && <p className="text-emerald-400">{info}</p>}
 
         {attendance && (
-          <div className="mt-2 overflow-auto rounded-2xl border border-slate-800">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-900/80">
-                <tr>
-                  <th className="px-3 py-2 text-left text-slate-400">Roll</th>
-                  <th className="px-3 py-2 text-left text-slate-400">Name</th>
-                  <th className="px-3 py-2 text-center text-slate-400">
-                    Present
-                  </th>
-                  <th className="px-3 py-2 text-center text-slate-400">
-                    Source
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {attendance.students.map((s, idx) => (
-                  <tr
-                    key={s.student_id}
-                    className={
-                      idx % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40"
+          <table className="min-w-full text-sm border border-slate-700 rounded-xl overflow-hidden">
+            <thead className="bg-slate-800">
+              <tr>
+                <th className="px-3 py-2">Roll</th>
+                <th className="px-3 py-2">Name</th>
+                <th className="px-3 py-2">Present</th>
+                <th className="px-3 py-2">Source</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {attendance.students.map((s, i) =>
+                <tr key={s.student_id} className={i % 2 ? "bg-slate-900" : "bg-slate-950"}>
+                  <td className="px-3 py-2 font-mono">{s.roll_no}</td>
+                  <td className="px-3 py-2">{s.name}</td>
+                  <td className="px-3 py-2 text-center">
+                    <input type="checkbox"
+                      checked={s.present}
+                      onChange={() => togglePresent(s.student_id)}
+                      className="h-4 w-4 accent-emerald-500" />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {s.source === "iot" ?
+                      <span className="px-2 py-1 bg-emerald-800 rounded-full text-emerald-200">IoT</span> :
+                      <span className="px-2 py-1 bg-slate-700 rounded-full">Manual</span>
                     }
-                  >
-                    <td className="px-3 py-2 font-mono text-slate-200">
-                      {s.roll_no}
-                    </td>
-                    <td className="px-3 py-2">{s.name}</td>
-                    <td className="px-3 py-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={!!s.present}
-                        onChange={() => togglePresent(s.student_id)}
-                        className="h-4 w-4 accent-emerald-500"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs">
-                      {s.source === "iot" ? (
-                        <span className="px-2 py-1 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-700">
-                          IoT
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 rounded-full bg-slate-800 text-slate-200 border border-slate-600">
-                          Manual
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {attendance.students.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-3 py-4 text-center text-slate-400"
-                    >
-                      No students yet. Tap cards on the IoT device.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         )}
 
-        {!attendance && !loading && !error && (
-          <p className="text-slate-400 text-sm">
-            No data from device yet. Check if ESP32-S3 is online.
-          </p>
-        )}
       </div>
+
       <p className="mt-3 text-xs text-slate-500">
         Connected to device: <span className="font-mono">{S3_BASE_URL}</span>
       </p>
@@ -244,6 +180,6 @@ function App() {
   );
 }
 
-// Mount React app
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+                                                            
